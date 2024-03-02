@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(MyApp());
 }
 
@@ -11,13 +18,26 @@ class MyApp extends StatelessWidget {
   final _textEditingController = TextEditingController();
 
   // Fungsi akan dipanggil ketika tombol 'tambah todo' ditekan
-  void handleCreateTodo() {}
+  void handleCreateTodo() {
+    final newTodo = {
+      'todo': _textEditingController.text,
+      'status': false,
+      'timestamp': DateTime.now().millisecondsSinceEpoch
+    };
+
+    FirebaseFirestore.instance.collection('todos').doc().set(newTodo);
+  }
 
   // Fungsi akan dipanggil ketika todo di checklist/unchecklist
-  void handleToggleTodo(String id, bool status) {}
+  void handleToggleTodo(String id, bool status) {
+    final changeStatus = {'status': !status};
+    FirebaseFirestore.instance.collection('todos').doc(id).update(changeStatus);
+  }
 
   // Fungsi akan dipanggil ketika menghapus salah satu todo
-  void handleDeleteTodo(String id) {}
+  void handleDeleteTodo(String id) {
+    FirebaseFirestore.instance.collection('todos').doc(id).delete();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,33 +65,54 @@ class MyApp extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          Column(
-                            children: [
-                              // Todo Item
-                              TodoItemWidget(
-                                id: "1",
-                                name: "Ini todo pertama",
-                                status: true,
-                                onDelete: (id) {
-                                  handleDeleteTodo(id);
-                                },
-                                onToggle: (id, status) {
-                                  handleToggleTodo(id, status);
-                                },
-                              ),
-                              TodoItemWidget(
-                                id: "2",
-                                name: "Ini todo kedua",
-                                status: false,
-                                onDelete: (id) {
-                                  handleDeleteTodo(id);
-                                },
-                                onToggle: (id, status) {
-                                  handleToggleTodo(id, status);
-                                },
-                              ),
-                            ],
-                          ),
+                          // Todo Item
+                          // TodoItemWidget(
+                          //   id: "1",
+                          //   name: "Ini todo pertama",
+                          //   status: true,
+                          //   onDelete: (id) {
+                          //     handleDeleteTodo(id);
+                          //   },
+                          //   onToggle: (id, status) {
+                          //     handleToggleTodo(id, status);
+                          //   },
+                          // ),
+                          // TodoItemWidget(
+                          //   id: "2",
+                          //   name: "Ini todo kedua",
+                          //   status: false,
+                          //   onDelete: (id) {
+                          //     handleDeleteTodo(id);
+                          //   },
+                          //   onToggle: (id, status) {
+                          //     handleToggleTodo(id, status);
+                          //   },
+                          // ),
+                          StreamBuilder(
+                              stream: FirebaseFirestore.instance
+                                  .collection('todos')
+                                  .orderBy('timestamp', descending: false)
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return Text('Sedang Loading');
+                                } else if (snapshot.hasError) {
+                                  return Text('Error: ${snapshot.error}');
+                                } else {
+                                  return Column(
+                                    children: [
+                                      for (var documents in snapshot.data!.docs)
+                                        TodoItemWidget(
+                                            id: documents.id,
+                                            name: documents.data()['todo'],
+                                            status: documents.data()['status'],
+                                            onDelete: handleDeleteTodo,
+                                            onToggle: handleToggleTodo)
+                                    ],
+                                  );
+                                }
+                              }),
                         ],
                       ),
                     )
